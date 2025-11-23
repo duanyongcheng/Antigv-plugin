@@ -771,23 +771,25 @@ router.get('/v1/models', authenticateApiKey, async (req, res) => {
 router.post('/v1/chat/completions', authenticateApiKey, async (req, res) => {
   const { messages, model, stream = true, tools, ...params } = req.body;
 
-  try {
-    if (!messages) {
-      return res.status(400).json({ error: 'messages是必需的' });
-    }
+  // 参数验证错误仍返回400
+  if (!messages) {
+    return res.status(400).json({ error: 'messages是必需的' });
+  }
 
-    const requestBody = generateRequestBody(messages, model, params, tools);
+  const requestBody = generateRequestBody(messages, model, params, tools);
 
-    if (stream) {
-      res.setHeader('Content-Type', 'text/event-stream');
-      res.setHeader('Cache-Control', 'no-cache');
-      res.setHeader('Connection', 'keep-alive');
+  if (stream) {
+    // 流式响应始终返回200，错误通过流传递
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
 
-      const id = `chatcmpl-${Date.now()}`;
-      const created = Math.floor(Date.now() / 1000);
-      let hasToolCall = false;
-      let collectedImages = [];
+    const id = `chatcmpl-${Date.now()}`;
+    const created = Math.floor(Date.now() / 1000);
+    let hasToolCall = false;
+    let collectedImages = [];
 
+    try {
       await multiAccountClient.generateResponse(requestBody, (data) => {
         if (data.type === 'tool_calls') {
           hasToolCall = true;
@@ -843,7 +845,29 @@ router.post('/v1/chat/completions', authenticateApiKey, async (req, res) => {
       })}\n\n`);
       res.write('data: [DONE]\n\n');
       res.end();
-    } else {
+    } catch (error) {
+      // 流式错误处理：在流中发送错误信息
+      logger.error('生成响应失败:', error.message);
+      res.write(`data: ${JSON.stringify({
+        id,
+        object: 'chat.completion.chunk',
+        created,
+        model,
+        choices: [{ index: 0, delta: { content: `\n\n错误: ${error.message}` }, finish_reason: null }]
+      })}\n\n`);
+      res.write(`data: ${JSON.stringify({
+        id,
+        object: 'chat.completion.chunk',
+        created,
+        model,
+        choices: [{ index: 0, delta: {}, finish_reason: 'stop' }]
+      })}\n\n`);
+      res.write('data: [DONE]\n\n');
+      res.end();
+    }
+  } else {
+    // 非流式响应：正常错误处理
+    try {
       let fullContent = '';
       let toolCalls = [];
       let collectedImages = [];
@@ -883,35 +907,11 @@ router.post('/v1/chat/completions', authenticateApiKey, async (req, res) => {
           finish_reason: toolCalls.length > 0 ? 'tool_calls' : 'stop'
         }]
       });
-    }
-  } catch (error) {
-    logger.error('生成响应失败:', error.message);
-    const statusCode = error.statusCode || 500;
-    const errorMessage = error.responseText || error.message;
-    
-    if (!res.headersSent) {
-      // 如果还没有发送响应头，返回正确的状态码
+    } catch (error) {
+      logger.error('生成响应失败:', error.message);
+      const statusCode = error.statusCode || 500;
+      const errorMessage = error.responseText || error.message;
       res.status(statusCode).json({ error: errorMessage });
-    } else if (stream) {
-      // 如果已经开始流式传输，只能在流中发送错误信息
-      const id = `chatcmpl-${Date.now()}`;
-      const created = Math.floor(Date.now() / 1000);
-      res.write(`data: ${JSON.stringify({
-        id,
-        object: 'chat.completion.chunk',
-        created,
-        model,
-        choices: [{ index: 0, delta: { content: `错误: ${errorMessage}` }, finish_reason: null }]
-      })}\n\n`);
-      res.write(`data: ${JSON.stringify({
-        id,
-        object: 'chat.completion.chunk',
-        created,
-        model,
-        choices: [{ index: 0, delta: {}, finish_reason: 'stop' }]
-      })}\n\n`);
-      res.write('data: [DONE]\n\n');
-      res.end();
     }
   }
 });
