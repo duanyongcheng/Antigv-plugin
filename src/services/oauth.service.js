@@ -517,10 +517,10 @@ class OAuthService {
     
     logger.info(`配额获取完成: cookie_id=${cookie_id}, 共${Object.keys(mergedModels).length}个模型`);
 
-    // 判断是否为付费用户
+    // 判断是否为付费用户：paidTier.id 不包含 'free' 字符串则为付费用户
     let paid_tier = null;
     if (projectData.paidTier?.id) {
-      paid_tier = projectData.paidTier.id !== 'free' && projectData.paidTier.id !== 'free-tier';
+      paid_tier = !projectData.paidTier.id.toLowerCase().includes('free');
     }
 
     // 第三步：创建账号
