@@ -51,6 +51,10 @@ class ProjectService {
       // 调用API获取项目信息
       const apiResponse = await this.loadCodeAssist(accessToken);
       
+      // 默认值
+      let is_restricted = false;
+      let ineligible = false;
+      
       // 检查 ineligibleTiers 是否存在
       if (apiResponse.ineligibleTiers && apiResponse.ineligibleTiers.length > 0) {
         // 检查是否包含 INELIGIBLE_ACCOUNT
@@ -59,8 +63,8 @@ class ProjectService {
         );
         
         if (hasIneligibleAccount) {
-          // 如果是 INELIGIBLE_ACCOUNT，账号不合格，抛出错误
-          throw new Error('账号不符合使用条件 (INELIGIBLE_ACCOUNT)');
+          // 如果是 INELIGIBLE_ACCOUNT，设置 ineligible=true
+          ineligible = true;
         }
         
         // 检查是否包含 UNSUPPORTED_LOCATION
@@ -69,24 +73,20 @@ class ProjectService {
         );
         
         if (hasUnsupportedLocation) {
-          // 如果是 UNSUPPORTED_LOCATION，project_id_0 为空，is_restricted 为 true
-          const updatedAccount = await accountService.updateProjectIds(
-            cookie_id,
-            apiResponse.cloudaicompanionProject,
-            true
-          );
-          return updatedAccount;
+          // 如果是 UNSUPPORTED_LOCATION，设置 is_restricted=true
+          is_restricted = true;
         }
       }
       
-      // 如果不含有 ineligibleTiers 或者 ineligibleTiers 为空，使用 cloudaicompanionProject 的值
+      // 只要有 cloudaicompanionProject，就填入 project_id_0
       const project_id_0 = apiResponse.cloudaicompanionProject || '';
       
       // 更新数据库
       const updatedAccount = await accountService.updateProjectIds(
         cookie_id,
         project_id_0,
-        false
+        is_restricted,
+        ineligible
       );
       
       return updatedAccount;

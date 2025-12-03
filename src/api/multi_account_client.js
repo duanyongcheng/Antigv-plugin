@@ -593,10 +593,7 @@ class MultiAccountClient {
       'Content-Type': 'application/json',
       'Accept-Encoding': 'gzip'
     };
-    
-    // 在选择projectId之后打印完整的请求体
-    logger.info('[图片生成-上游请求体] 最终使用的projectId:', requestBody.project || '(空)');
-    logger.info('[图片生成-上游请求体] 完整内容:', JSON.stringify(requestBody, null, 2));
+
     
     let response;
     

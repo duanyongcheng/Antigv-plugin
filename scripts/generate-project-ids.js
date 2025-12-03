@@ -30,11 +30,11 @@ async function generateProjectIdsForAllAccounts() {
     
     // 获取所有账号
     const result = await database.query(
-      'SELECT cookie_id, access_token, refresh_token, expires_at, project_id_0 FROM accounts WHERE status = 1 ORDER BY created_at ASC'
+      'SELECT cookie_id, access_token, refresh_token, expires_at, project_id_0 FROM accounts ORDER BY created_at ASC'
     );
     
     const accounts = result.rows;
-    logger.info(`找到 ${accounts.length} 个启用的账号`);
+    logger.info(`找到 ${accounts.length} 个账号`);
     
     let successCount = 0;
     let failedCount = 0;
