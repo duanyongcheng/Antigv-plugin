@@ -16,10 +16,8 @@ FROM base AS dependencies
 # 这样做可以充分利用Docker的层缓存。只要这些文件不改变，就不需要重新安装依赖。
 COPY package.json package-lock.json* ./
 
-# 安装生产环境依赖。
-# 使用 'npm ci' 是最佳实践，它比 'npm install' 更快、更可靠，因为它严格按照 lock 文件安装。
-# '--only=production' 确保不安装devDependencies。
-RUN npm ci --only=production
+# 安装生产环境依赖
+RUN npm install --omit=dev
 
 
 # --- 源码阶段 (Source Stage) ---
@@ -55,7 +53,7 @@ RUN chown -R appuser:appgroup /usr/src/app/src /usr/src/app/node_modules /usr/sr
 USER appuser
 
 # 暴露您的应用程序正在监听的端口。请务必修改为您的实际端口。
-EXPOSE 8045
+EXPOSE 8046
 
 # 定义容器启动时执行的命令
 CMD [ "node", "src/server/index.js" ]
